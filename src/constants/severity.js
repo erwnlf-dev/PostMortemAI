@@ -1,0 +1,38 @@
+export const SEVERITY_LEVELS = [
+  {
+    value: 'P1',
+    label: 'P1 — Critical',
+    shortLabel: 'P1',
+    color: '#FF4D4D',
+    bg: 'rgba(255, 77, 77, 0.12)',
+    border: 'rgba(255, 77, 77, 0.3)',
+    description: 'Complete service outage, all users impacted',
+  },
+  {
+    value: 'P2',
+    label: 'P2 — High',
+    shortLabel: 'P2',
+    color: '#FF8C00',
+    bg: 'rgba(255, 140, 0, 0.12)',
+    border: 'rgba(255, 140, 0, 0.3)',
+    description: 'Major degradation, significant user impact',
+  },
+  {
+    value: 'P3',
+    label: 'P3 — Medium',
+    shortLabel: 'P3',
+    color: '#FFD700',
+    bg: 'rgba(255, 215, 0, 0.12)',
+    border: 'rgba(255, 215, 0, 0.3)',
+    description: 'Partial degradation, limited user impact',
+  },
+  {
+    value: 'P4',
+    label: 'P4 — Low',
+    shortLabel: 'P4',
+    color: '#4CAF50',
+    bg: 'rgba(76, 175, 80, 0.12)',
+    border: 'rgba(76, 175, 80, 0.3)',
+    description: 'Minor issue, minimal user impact',
+  },
+];
