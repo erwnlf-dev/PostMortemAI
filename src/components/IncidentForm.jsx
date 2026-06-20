@@ -102,8 +102,8 @@ export default function IncidentForm({ onSubmit, loading, error, onClearError, i
         )}
 
         {/* ── Identity Section ── */}
-        <div style={s.sectionLabel}>
-          Incident Identity
+        <div style={{ ...s.sectionLabel, fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em' }}>
+          // 01_INCIDENT_IDENTITY
           <span style={s.sectionLine} />
         </div>
 
@@ -133,22 +133,24 @@ export default function IncidentForm({ onSubmit, loading, error, onClearError, i
           <div style={{
             marginTop: 14,
             padding: '10px 14px',
-            background: 'var(--accent-subtle)',
-            border: '1px solid var(--accent-muted)',
-            borderRadius: 10,
-            fontSize: 12,
-            color: 'var(--text-primary)',
+            background: 'var(--bg-secondary)',
+            border: '1px solid var(--border-primary)',
+            borderLeft: '3px solid var(--accent)',
+            borderRadius: 'var(--radius-sm)',
+            fontSize: 11,
+            fontFamily: 'var(--font-mono)',
+            color: 'var(--text-secondary)',
             display: 'flex',
             alignItems: 'center',
+            justifyContent: 'space-between',
             gap: 8,
           }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" style={{ flexShrink: 0 }}>
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="12 6 12 12 16 14" />
-            </svg>
-            <span>
-              Calculated MTTR (Duration): <strong>{duration}</strong>
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="status-ping-active" style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--success)' }} />
+              <span>MTTR_METRIC:</span>
+              <strong style={{ color: 'var(--accent)' }}>{duration.toUpperCase()}</strong>
+            </div>
+            <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>[ CALCULATION: OK ]</span>
           </div>
         )}
 
@@ -202,8 +204,8 @@ export default function IncidentForm({ onSubmit, loading, error, onClearError, i
         <div style={s.divider} />
 
         {/* ── Impact Section ── */}
-        <div style={s.sectionLabel}>
-          Impact Scope
+        <div style={{ ...s.sectionLabel, fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em' }}>
+          // 02_IMPACT_SCOPE
           <span style={s.sectionLine} />
         </div>
 
@@ -221,8 +223,8 @@ export default function IncidentForm({ onSubmit, loading, error, onClearError, i
         <div style={s.divider} />
 
         {/* ── Details Section ── */}
-        <div style={s.sectionLabel}>
-          Incident Details
+        <div style={{ ...s.sectionLabel, fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em' }}>
+          // 03_INCIDENT_DETAILS
           <span style={s.sectionLine} />
         </div>
 

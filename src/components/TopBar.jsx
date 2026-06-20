@@ -22,9 +22,28 @@ export default function TopBar({ settings, onOpenSettings, isMobile }) {
         </div>
 
         <div style={mobile.right}>
-          <div style={mobile.providerBadge}>
-            <span style={shared.providerDot} />
-            <span style={{ fontSize: 11 }}>{provider?.label || '—'}</span>
+          <div style={{
+            ...mobile.providerBadge,
+            fontFamily: 'var(--font-mono)',
+            fontSize: 10,
+            textTransform: 'uppercase',
+            letterSpacing: '0.02em',
+            padding: '4px 10px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}>
+            <span
+              className={settings.apiKey || settings.provider === 'custom' ? 'status-ping-active' : 'status-ping-warning'}
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: settings.apiKey || settings.provider === 'custom' ? 'var(--success)' : 'var(--warning)',
+                display: 'inline-block',
+              }}
+            />
+            {provider?.label || '—'}
           </div>
           <button style={mobile.settingsBtn} onClick={onOpenSettings}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -55,12 +74,40 @@ export default function TopBar({ settings, onOpenSettings, isMobile }) {
       </div>
 
       <div style={desktop.center}>
-        <div style={desktop.providerBadge}>
-          <span style={shared.providerDot} />
-          {provider?.label || 'Not configured'}
+        <div style={{
+          ...desktop.providerBadge,
+          fontFamily: 'var(--font-mono)',
+          fontSize: 11,
+          letterSpacing: '0.04em',
+          textTransform: 'uppercase',
+          padding: '4px 10px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+        }}>
+          <span
+            className={settings.apiKey || settings.provider === 'custom' ? 'status-ping-active' : 'status-ping-warning'}
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: settings.apiKey || settings.provider === 'custom' ? 'var(--success)' : 'var(--warning)',
+              display: 'inline-block',
+            }}
+          />
+          ENGINE: {provider?.label || 'OFFLINE'}
         </div>
         {settings.model && (
-          <span style={desktop.modelTag}>{settings.model}</span>
+          <span style={{
+            ...desktop.modelTag,
+            fontFamily: 'var(--font-mono)',
+            fontSize: 10,
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+            background: 'var(--bg-hover)',
+            border: '1px solid var(--border-primary)',
+            padding: '3px 8px',
+          }}>{settings.model}</span>
         )}
       </div>
 

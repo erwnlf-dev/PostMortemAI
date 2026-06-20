@@ -232,7 +232,10 @@ export default function HistoryPanel({ history, selectedId, onSelect, onDelete, 
               aria-label={`Select report for incident ${item.incidentId || 'N/A'}`}
             >
               <div style={s.itemTop}>
-                <span style={s.itemId}>{item.incidentId || 'N/A'}</span>
+                <span style={s.itemId}>
+                  <span style={{ color: 'var(--text-muted)', fontSize: 10, marginRight: 4, fontWeight: 500 }}>ID:</span>
+                  {item.incidentId || 'UNNAMED'}
+                </span>
                 {sev && (
                   <span
                     style={{
@@ -247,7 +250,9 @@ export default function HistoryPanel({ history, selectedId, onSelect, onDelete, 
                 )}
               </div>
               <div style={s.itemBottom}>
-                <span style={s.itemDate}>{formatDate(item.timestamp)}</span>
+                <span style={{ ...s.itemDate, fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.02em' }}>
+                  {formatDate(item.timestamp).toUpperCase()}
+                </span>
               </div>
               <button
                 className="delete-btn"
