@@ -69,6 +69,36 @@ PostMortem AI is a serverless SaaS utility that transforms raw incident data (ti
 
 ---
 
+## ⚙️ AI API & Provider Configuration
+
+PostMortem AI supports multiple AI models and API gateways. You can configure them either directly in the browser UI or set default environment variables.
+
+### 1. In-App UI Configuration (Settings Panel)
+
+Click the **Gear Icon (AI Settings)** in the top-right corner of the application:
+* **OpenAI Setup**: Select the **OpenAI** card. Paste your OpenAI API key (starts with `sk-`). You can customize the model name (default: `gpt-4o`).
+* **Anthropic Setup**: Select the **Anthropic** card. Paste your Anthropic API key (starts with `sk-ant-`). You can customize the model name (default: `claude-sonnet-4-20250514`).
+* **Custom OpenAI-Compatible Provider**: Select the **Custom Provider** card. Paste your token (if required) and fill in the **Base URL** (e.g., `https://openrouter.ai/api` or `http://localhost:11434/v1` for a local Ollama server).
+
+*All keys entered via the settings modal are base64-obfuscated and safely stored within the browser's `localStorage` namespace.*
+
+### 2. Default Configuration via `.env` file
+
+For deployments or local defaults, create a `.env` file in the root directory (copied from `.env.example`) and edit the following values:
+
+```env
+# Choose default provider: openai | anthropic | custom
+VITE_DEFAULT_PROVIDER=openai
+
+# Set default model name
+VITE_DEFAULT_MODEL=gpt-4o
+
+# Base URL for custom gateways (e.g., OpenRouter, LM Studio, Ollama)
+VITE_CUSTOM_BASE_URL=
+```
+
+---
+
 ## 🔒 Security Note (BYOK)
 
 PostMortem AI operates under a **Bring Your Own Key (BYOK)** model. All LLM queries are executed directly from the client's browser using the provided API keys:
