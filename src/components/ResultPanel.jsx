@@ -2,6 +2,81 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
+function translateMarkdownToJira(markdown) {
+  if (!markdown) return '';
+  
+  // First split into lines to process tables
+  const lines = markdown.split('\n');
+  let inTable = false;
+  let isFirstRow = true;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (line.startsWith('|') && line.endsWith('|')) {
+      // Check if it's a separator row (e.g. |---|---| or | :--- | ---: |)
+      if (/^[|:\-\s]+$/.test(line)) {
+        lines.splice(i, 1);
+        i--; // Adjust index since we removed a line
+        continue;
+      }
+      if (!inTable) {
+        inTable = true;
+        isFirstRow = true;
+      }
+      const cells = line.slice(1, -1).split('|').map(c => c.trim());
+      if (isFirstRow) {
+        lines[i] = '|| ' + cells.join(' || ') + ' ||';
+        isFirstRow = false;
+      } else {
+        lines[i] = '| ' + cells.join(' | ') + ' |';
+      }
+    } else {
+      inTable = false;
+    }
+  }
+  let converted = lines.join('\n');
+
+  // Convert code blocks first (removes triple backticks so inline code won't match them)
+  converted = converted
+    .replace(/```(?:[a-zA-Z0-9]+)?\n([\s\S]*?)```/g, '{code}\n$1{code}');
+
+  // Convert headers
+  converted = converted
+    .replace(/^# (.*?)$/gm, 'h1. $1')
+    .replace(/^## (.*?)$/gm, 'h2. $1')
+    .replace(/^### (.*?)$/gm, 'h3. $1')
+    .replace(/^#### (.*?)$/gm, 'h4. $1');
+
+  // Convert inline code
+  converted = converted
+    .replace(/`([^`]+)`/g, '{{$1}}');
+
+  // Convert bold using temporary placeholders to prevent italic rule conflicts
+  converted = converted
+    .replace(/\*\*(.*?)\*\*/g, '__TEMP_BOLD_START__$1__TEMP_BOLD_END__');
+
+  // Convert italics (matches single asterisk, excluding pipe chars for tables)
+  converted = converted
+    .replace(/\*([^*|]+)\*/g, '_$1_');
+
+  // Restore bold tags to Jira's single asterisk *bold* syntax
+  converted = converted
+    .replace(/__TEMP_BOLD_START__/g, '*')
+    .replace(/__TEMP_BOLD_END__/g, '*');
+
+  // Other translations
+  converted = converted
+    // Bullet lists: - item -> * item
+    .replace(/^\s*[-*]\s+(.*?)$/gm, '* $1')
+    // Ordered lists: 1. item -> # item
+    .replace(/^\s*\d+\.\s+(.*?)$/gm, '# $1')
+    // Links: [Text](URL) -> [Text|URL]
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '[$1|$2]')
+    // Horizontal rules: --- -> ----
+    .replace(/^---$/gm, '----');
+
+  return converted;
+}
+
 const s = {
   container: {
     display: 'flex',
@@ -139,13 +214,20 @@ const s = {
 export default function ResultPanel({ report, loading, onCancel }) {
   const [view, setView] = useState('rendered');
   const [copied, setCopied] = useState(false);
+  const [copiedJira, setCopiedJira] = useState(false);
+  const [copiedConfluence, setCopiedConfluence] = useState(false);
+  const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
   const copyTimeoutRef = useRef(null);
+  const copyJiraTimeoutRef = useRef(null);
+  const copyConfluenceTimeoutRef = useRef(null);
+  const dropdownRef = useRef(null);
 
   const handleCopy = useCallback(async () => {
     if (!report) return;
     try {
       await navigator.clipboard.writeText(report);
       setCopied(true);
+      setExportDropdownOpen(false);
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
       copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -157,13 +239,88 @@ export default function ResultPanel({ report, loading, onCancel }) {
       document.execCommand('copy');
       document.body.removeChild(textarea);
       setCopied(true);
+      setExportDropdownOpen(false);
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
       copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
     }
   }, [report]);
 
+  const handleCopyJira = useCallback(async () => {
+    if (!report) return;
+    const jiraMarkup = translateMarkdownToJira(report);
+    try {
+      await navigator.clipboard.writeText(jiraMarkup);
+      setCopiedJira(true);
+      setExportDropdownOpen(false);
+      if (copyJiraTimeoutRef.current) clearTimeout(copyJiraTimeoutRef.current);
+      copyJiraTimeoutRef.current = setTimeout(() => setCopiedJira(false), 2000);
+    } catch {
+      // Fallback for older browsers
+      const textarea = document.createElement('textarea');
+      textarea.value = jiraMarkup;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      setCopiedJira(true);
+      setExportDropdownOpen(false);
+      if (copyJiraTimeoutRef.current) clearTimeout(copyJiraTimeoutRef.current);
+      copyJiraTimeoutRef.current = setTimeout(() => setCopiedJira(false), 2000);
+    }
+  }, [report]);
+
+  const handleCopyConfluence = useCallback(async () => {
+    if (!report) return;
+    try {
+      const el = document.querySelector('.markdown-body');
+      let htmlContent = el ? el.innerHTML : '';
+      
+      if (!htmlContent) {
+        htmlContent = `<div style="font-family: sans-serif;">${report.replace(/\n/g, '<br/>')}</div>`;
+      }
+      
+      const blobHtml = new Blob([htmlContent], { type: 'text/html' });
+      const blobText = new Blob([report], { type: 'text/plain' });
+      
+      if (typeof ClipboardItem !== 'undefined') {
+        const item = new ClipboardItem({
+          'text/html': blobHtml,
+          'text/plain': blobText
+        });
+        await navigator.clipboard.write([item]);
+        setCopiedConfluence(true);
+        setExportDropdownOpen(false);
+        if (copyConfluenceTimeoutRef.current) clearTimeout(copyConfluenceTimeoutRef.current);
+        copyConfluenceTimeoutRef.current = setTimeout(() => setCopiedConfluence(false), 2000);
+      } else {
+        throw new Error('ClipboardItem not supported');
+      }
+    } catch (err) {
+      console.warn('HTML clipboard copy failed, falling back to markdown plain text:', err);
+      try {
+        await navigator.clipboard.writeText(report);
+        setCopiedConfluence(true);
+        setExportDropdownOpen(false);
+        if (copyConfluenceTimeoutRef.current) clearTimeout(copyConfluenceTimeoutRef.current);
+        copyConfluenceTimeoutRef.current = setTimeout(() => setCopiedConfluence(false), 2000);
+      } catch {
+        const textarea = document.createElement('textarea');
+        textarea.value = report;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        setCopiedConfluence(true);
+        setExportDropdownOpen(false);
+        if (copyConfluenceTimeoutRef.current) clearTimeout(copyConfluenceTimeoutRef.current);
+        copyConfluenceTimeoutRef.current = setTimeout(() => setCopiedConfluence(false), 2000);
+      }
+    }
+  }, [report]);
+
   const handleDownload = useCallback(() => {
     if (!report) return;
+    setExportDropdownOpen(false);
     const blob = new Blob([report], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -177,9 +334,27 @@ export default function ResultPanel({ report, loading, onCancel }) {
     URL.revokeObjectURL(url);
   }, [report]);
 
+  const handlePrint = useCallback(() => {
+    window.print();
+  }, []);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setExportDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   useEffect(() => {
     return () => {
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      if (copyJiraTimeoutRef.current) clearTimeout(copyJiraTimeoutRef.current);
+      if (copyConfluenceTimeoutRef.current) clearTimeout(copyConfluenceTimeoutRef.current);
     };
   }, []);
 
@@ -290,43 +465,87 @@ export default function ResultPanel({ report, loading, onCancel }) {
           </div>
         </div>
         <div style={s.actions}>
-          <button
-            style={s.actionBtn}
-            onClick={handleCopy}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = 'var(--border-secondary)';
-              e.currentTarget.style.background = 'var(--bg-elevated)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = 'var(--border-primary)';
-              e.currentTarget.style.background = 'var(--bg-surface)';
-            }}
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-            </svg>
-            {copied ? 'Copied!' : 'Copy'}
-          </button>
-          <button
-            style={s.actionBtn}
-            onClick={handleDownload}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = 'var(--border-secondary)';
-              e.currentTarget.style.background = 'var(--bg-elevated)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = 'var(--border-primary)';
-              e.currentTarget.style.background = 'var(--bg-surface)';
-            }}
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-            Download .md
-          </button>
+          {/* Consolidated Export Dropdown */}
+          <div style={{ position: 'relative' }} ref={dropdownRef}>
+            <button
+              style={{
+                ...s.actionBtn,
+                background: exportDropdownOpen ? 'var(--bg-hover)' : 'var(--bg-surface)',
+                borderColor: exportDropdownOpen ? 'var(--border-secondary)' : 'var(--border-primary)',
+              }}
+              onClick={() => setExportDropdownOpen(prev => !prev)}
+              aria-haspopup="true"
+              aria-expanded={exportDropdownOpen}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = 'var(--border-secondary)';
+                e.currentTarget.style.background = 'var(--bg-elevated)';
+              }}
+              onMouseLeave={(e) => {
+                if (!exportDropdownOpen) {
+                  e.currentTarget.style.borderColor = 'var(--border-primary)';
+                  e.currentTarget.style.background = 'var(--bg-surface)';
+                }
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                <polyline points="16 6 12 2 8 6" />
+                <line x1="12" y1="2" x2="12" y2="15" />
+              </svg>
+              Export
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginLeft: 2, transform: exportDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.15s ease' }}>
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+
+            {exportDropdownOpen && (
+              <div className="export-dropdown-menu">
+                <button className="export-dropdown-item" onClick={handleCopy}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                  </svg>
+                  Copy Markdown
+                </button>
+                <button className="export-dropdown-item" onClick={handleCopyJira}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                    <polyline points="2 17 12 22 22 17" />
+                    <polyline points="2 12 12 17 22 12" />
+                  </svg>
+                  Copy for Jira
+                </button>
+                <button className="export-dropdown-item" onClick={handleCopyConfluence}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                  </svg>
+                  Copy for Confluence
+                </button>
+
+                <div className="export-divider" />
+
+                <button className="export-dropdown-item" onClick={handleDownload}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  Download .md File
+                </button>
+                <button className="export-dropdown-item" onClick={() => { setExportDropdownOpen(false); handlePrint(); }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 6 2 18 2 18 9" />
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                    <rect x="6" y="14" width="12" height="8" />
+                  </svg>
+                  Print / Save as PDF
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -340,12 +559,14 @@ export default function ResultPanel({ report, loading, onCancel }) {
         )}
       </div>
 
-      {copied && (
+      {(copied || copiedJira || copiedConfluence) && (
         <div style={s.copiedToast} className="animate-fade-in">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <polyline points="20 6 9 17 4 12" />
           </svg>
-          Copied to clipboard
+          {copied && 'Copied report to clipboard'}
+          {copiedJira && 'Copied Jira markup to clipboard!'}
+          {copiedConfluence && 'Copied rich format for Confluence!'}
         </div>
       )}
     </div>
